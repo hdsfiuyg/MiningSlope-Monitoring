@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slope Stability & Geotechnical Telemetry Control Center</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #151f32;
+            --border-color: #24344d;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-green: #10b981;
+            --accent-danger: #ef4444;
+            --accent-warn: #f59e0b;
+            --accent-purple: #a855f7;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-primary); padding: 24px; min-height: 100vh; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
+        h1 { font-size: 22px; font-weight: 600; color: #fff; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+        h1 i { color: var(--accent-blue); }
+        
+        .system-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .meta-tag { background: #1e293b; border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; font-size: 13px; color: var(--text-secondary); }
+        .meta-tag span { font-weight: 600; color: #fff; }
+
+        .btn-gap-filter { font-weight: 600; border-radius: 6px; background: #1e293b; color: var(--text-secondary); border: 1px solid var(--border-color); cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+        .btn-gap-filter:hover { opacity: 0.8; }
+        .btn-success { font-weight: 600; border-radius: 6px; background: var(--accent-green); color: #0b0f19; border: none; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+        .btn-success:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .hero-banner { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px; }
+        .hero-card { background: linear-gradient(145deg, #151f32, #0b0f19); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
+        .hero-card.purple { border-bottom: 4px solid var(--accent-purple); }
+        .hero-card.warn { border-bottom: 4px solid var(--accent-warn); }
+        .hero-card.info { border-bottom: 4px solid var(--accent-blue); }
+        .hero-label { font-size: 14px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
+        .hero-value { font-size: 42px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+
+        .alert-ribbon { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .alert-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; display: flex; align-items: center; gap: 14px; font-weight: 600; font-size: 14px; transition: all 0.3s ease; }
+        .alert-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #1e293b; color: var(--text-secondary); font-size: 16px; }
+        
+        .danger-active { background: #450a0a !important; border-color: var(--accent-danger) !important; color: #fca5a5 !important; }
+        .danger-active .alert-icon { background: var(--accent-danger) !important; color: #fff !important; animation: blink 1.2s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        .bench-visualizer-container { display: flex; align-items: flex-end; justify-content: center; height: 220px; background: #0e1626; border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; overflow: hidden; }
+        .bench-block { height: 140px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .bench-stable { width: 40%; background: linear-gradient(180deg, #334155 0%, #0f172a 100%); border-right: 2px solid #475569; }
+        .bench-unstable { width: 40%; background: linear-gradient(180deg, #475569 0%, #1e293b 100%); border-left: 2px solid #64748b; }
+        
+        .bench-gap-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 20px; transition: width 0.5s ease; position: relative; height: 140px;}
+        .gap-ruler { width: 100%; height: 2px; background: var(--accent-purple); position: relative; }
+        .gap-ruler::before, .gap-ruler::after { content: ''; position: absolute; width: 2px; height: 10px; background: var(--accent-purple); top: -4px; }
+        .gap-ruler::before { left: 0; } .gap-ruler::after { right: 0; }
+        .gap-text { position: absolute; top: -25px; font-size: 12px; font-weight: bold; color: var(--accent-purple); white-space: nowrap; }
+        
+        .visualizer-label { font-size: 11px; font-weight: bold; color: #cbd5e1; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
+        .visualizer-data { font-size: 12px; color: var(--accent-blue); margin-top: 4px; }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shaking { animation: shake 0.5s infinite; }
+
+        .main-workspace { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px; }
+        @media(max-width: 1200px) { .main-workspace { grid-template-columns: 1fr; } }
+
+        .telemetry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+        .card-label { font-size: 12px; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .card-value { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+        .card-subtext { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+        
+        .instrumentation-panel { display: flex; flex-direction: column; gap: 24px; }
+        .map-wrapper { height: 320px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; position: relative; }
+        #map { height: 100%; width: 100%; }
+
+        .compass-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .compass-container { position: relative; width: 140px; height: 140px; margin: 15px 0; }
+        .compass-value { font-size: 18px; font-weight: 700; color: #fff; margin-top: 5px; }
+
+        .analytics-container { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+        .analytics-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; gap: 16px; }
+        .analytics-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        
+        .controls-group { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+        .time-select-wrapper { display: flex; align-items: center; gap: 8px; }
+        .time-select-wrapper label { font-size: 13px; color: var(--text-secondary); }
+        .time-dropdown { background: #1e293b; border: 1px solid var(--border-color); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; outline: none; cursor: pointer; }
+        
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; }
+        @media(max-width: 600px) { .charts-grid { grid-template-columns: 1fr; } }
+        .chart-box { background: #0e1626; border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; min-height: 260px; }
+
+        /* Styles for the averages display */
+        .avg-card-container { display: flex; gap: 15px; flex-wrap: wrap; }
+        .avg-card { background: #1e293b; border: 1px solid var(--border-color); padding: 12px 16px; border-radius: 6px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
+        .avg-card span { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; font-weight: bold; }
+        .avg-card strong { color: var(--accent-blue); font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <header>
+    <div>
+        <h1>
+            <i class="fa-solid fa-mountain-subway"></i>
+            Slope Stability Telemetry Control
+        </h1>
+
+        <div style="margin-top: 4px; display: flex; gap: 12px; align-items: center;">
+            <p style="font-size: 13px; color: var(--text-secondary);">
+                Tracking Engine Core Matrix:
+            </p>
+
+            <span id="system-mode"
+                style="
+                font-size: 12px;
+                font-weight: bold;
+                padding: 2px 6px;
+                border-radius: 4px;
+                background: #2563eb;
+                color: #fff;">
+                ACTIVE
+            </span>
+        </div>
+    </div>
+
+    <div class="system-meta">
+
+        <!-- Noise Filter -->
+        <button class="btn-gap-filter"
+            onclick="toggleGapFilter()"
+            style="padding:8px 16px;font-size:13px;">
+            <i class="fa-solid fa-filter-slash"></i>
+            Noise Filter: OFF
+        </button>
+
+        <!-- Historical Dashboard -->
+        <button
+            onclick="window.location.href='dashboard2.html'"
+            style="
+            background: var(--accent-purple);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            Historical Archive
+        </button>
+
+        <!-- Hardware Time -->
+        <div class="meta-tag">
+            Hardware Time Sync:
+            <span id="last-update">N/A</span>
+        </div>
+
+        <!-- Network Status -->
+        <div class="meta-tag">
+            Network Status:
+            <span id="network-badge"
+                style="color: var(--accent-green);">
+                <i class="fa-solid fa-circle-check"></i>
+                LIVE
+            </span>
+        </div>
+
+        <!-- Logged User -->
+        <div class="meta-tag">
+            User:
+            <span id="loggedUser">---</span>
+        </div>
+
+        <!-- Logout -->
+        <button
+            onclick="logout()"
+            style="
+            background:#ef4444;
+            color:white;
+            border:none;
+            padding:8px 16px;
+            border-radius:6px;
+            font-weight:600;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            gap:6px;">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            Logout
+        </button>
+
+    </div>
+</header>
+
+    <div class="hero-banner">
+        <div class="hero-card purple">
+            <div class="hero-label"><i class="fa-solid fa-ruler-horizontal"></i> Distance from Reference Point</div>
+            <div class="hero-value" id="hero-gap">0.0 cm</div>
+            <div style="color: var(--text-secondary); font-size: 13px; margin-top: 6px;">Absolute physical crack width (VL53L0X)</div>
+        </div>
+        <div class="hero-card warn">
+            <div class="hero-label"><i class="fa-solid fa-arrows-left-right"></i> Lateral Slip Distance</div>
+            <div class="hero-value" id="hero-dist">0.00 m</div>
+            <div style="color: var(--text-secondary); font-size: 13px; margin-top: 6px;">Drift from calibrated origin GPS coordinate</div>
+        </div>
+        <div class="hero-card info">
+            <div class="hero-label"><i class="fa-solid fa-location-arrow"></i> Directional Slip Bearing</div>
+            <div class="hero-value" id="hero-dir" style="color: var(--accent-blue);">STABLE</div>
+            <div style="color: var(--text-secondary); font-size: 13px; margin-top: 6px;">Geospatial trajectory vector of mass</div>
+        </div>
+    </div>
+
+    <div class="alert-ribbon">
+        <div id="alert-tof" class="alert-card">
+            <div class="alert-icon"><i class="fa-solid fa-arrows-left-right-to-line"></i></div>
+            <div><div>LASER GAP THRESHOLD</div><div style="font-size:11px; color:var(--text-secondary);" id="lbl-tof">MONITORING</div></div>
+        </div>
+        <div id="alert-fall" class="alert-card">
+            <div class="alert-icon"><i class="fa-solid fa-person-falling"></i></div>
+            <div><div>BENCH STABILITY</div><div style="font-size:11px; color:var(--text-secondary);" id="lbl-fall">MONITORING</div></div>
+        </div>
+        <div id="alert-tilt" class="alert-card">
+            <div class="alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div><div>TILT THRESHOLD</div><div style="font-size:11px; color:var(--text-secondary);" id="lbl-tilt">MONITORING</div></div>
+        </div>
+        <div id="alert-vibration" class="alert-card">
+            <div class="alert-icon"><i class="fa-solid fa-wave-square"></i></div>
+            <div><div>KINETIC VIBRATION</div><div style="font-size:11px; color:var(--text-secondary);" id="lbl-vib">MONITORING</div></div>
+        </div>
+    </div>
+
+    <div class="analytics-container">
+        <div class="analytics-header">
+            <div class="analytics-title"><i class="fa-solid fa-layer-group" style="color:var(--accent-warn);"></i> Live Bench Cross-Section Visualizer</div>
+        </div>
+        <div class="bench-visualizer-container">
+            <div class="bench-block bench-stable">
+                <div class="visualizer-label">Stable Wall (Origin)</div>
+                <i class="fa-solid fa-tower-broadcast" style="color:#64748b; font-size: 24px; margin-top:10px;"></i>
+            </div>
+            
+            <div class="bench-gap-container" id="vis-gap-container" style="width: 20px;">
+                <div class="gap-text" id="vis-gap-text">0.0 cm</div>
+                <div class="gap-ruler"></div>
+            </div>
+
+            <div class="bench-block bench-unstable" id="vis-unstable-block">
+                <div class="visualizer-label">Monitored Block</div>
+                <div class="visualizer-data" id="vis-gps-text">GPS Shift: 0.00 m</div>
+                <div class="visualizer-data" id="vis-vib-text" style="color: var(--accent-danger);">Vib: 0.00 g</div>
+                <i class="fa-solid fa-satellite-dish" style="color:#38bdf8; font-size: 20px; margin-top:8px;"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-workspace">
+        <div class="telemetry-grid">
+            <div class="card">
+                <span class="card-label">Pitch Displacement</span>
+                <span class="card-value" id="val-pitch">-- deg</span>
+                <span class="card-subtext" id="dev-pitch"><i class="fa-solid fa-arrow-right"></i> Structural X Deviation</span>
+            </div>
+            <div class="card">
+                <span class="card-label">Roll Displacement</span>
+                <span class="card-value" id="val-roll">-- deg</span>
+                <span class="card-subtext" id="dev-roll"><i class="fa-solid fa-arrow-right"></i> Structural Y Deviation</span>
+            </div>
+            <div class="card">
+                <span class="card-label">Surface Vibration Index</span>
+                <span class="card-value" id="val-surf-vib">0.00</span>
+                <span class="card-subtext" style="color: var(--accent-danger);"><i class="fa-solid fa-bolt"></i> IMU Dynamic Force (g)</span>
+            </div>
+            <div class="card">
+                <span class="card-label">Precipitation Index</span>
+                <span class="card-value" id="val-rain">-- %</span>
+                <span class="card-subtext"><i class="fa-solid fa-cloud-showers-heavy"></i> Live Saturation Level</span>
+            </div>
+            <div class="card">
+                <span class="card-label">Soil Hydrostatic Moisture</span>
+                <span class="card-value" id="val-soil">-- %</span>
+                <span class="card-subtext"><i class="fa-solid fa-droplet"></i> Subsurface Volumetric Content</span>
+            </div>
+            <div class="card">
+                <span class="card-label">Atmospheric Core Temp</span>
+                <span class="card-value" id="val-temp">-- °C</span>
+                <span class="card-subtext" id="val-hum">RH: -- %</span>
+            </div>
+            <div class="card">
+                <span class="card-label">Barometric Altitude</span>
+                <span class="card-value" id="val-alt-rel">-- m</span>
+                <span class="card-subtext" id="val-alt-abs">Abs Sea Lvl: -- m</span>
+            </div>
+            <div class="card">
+                <span class="card-label">Geospatial Vector Mapping</span>
+                <div style="font-size: 13px; font-weight: 600;" id="val-lat">Lat: --</div>
+                <div style="font-size: 13px; font-weight: 600; margin-top:2px;" id="val-lng">Lng: --</div>
+                <span class="card-subtext"><i class="fa-solid fa-location-dot"></i> Raw Sat Vectors</span>
+            </div>
+        </div>
+
+        <div class="instrumentation-panel">
+            <div class="map-wrapper"><div id="map"></div></div>
+            <div class="compass-card">
+                <span class="card-label" style="margin-bottom:0;">Device Head Direction</span>
+                <div class="compass-container" style="position: relative;">
+                    <svg viewBox="0 0 100 100" style="position: absolute; top:0; left:0; width: 100%; height: 100%;">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="#24344d" stroke-width="2"/>
+                        <circle cx="50" cy="50" r="41" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="2,2"/>
+                        <text x="50" y="15" fill="#94a3b8" font-size="10" font-weight="bold" text-anchor="middle">N</text>
+                        <text x="88" y="54" fill="#94a3b8" font-size="8" font-weight="bold" text-anchor="middle">E</text>
+                        <text x="50" y="92" fill="#94a3b8" font-size="8" font-weight="bold" text-anchor="middle">S</text>
+                        <text x="13" y="54" fill="#94a3b8" font-size="8" font-weight="bold" text-anchor="middle">W</text>
+                    </svg>
+                    <svg id="compass-needle" viewBox="0 0 100 100" style="position: absolute; top:0; left:0; width: 100%; height: 100%; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
+                        <polygon points="50,18 55,50 45,50" fill="#38bdf8" />
+                        <polygon points="50,82 53,50 47,50" fill="#475569" />
+                        <circle cx="50" cy="50" r="4" fill="#fff"/>
+                    </svg>
+                </div>
+                <div class="compass-value" id="lbl-heading" style="color: #38bdf8;">--°</div>
+                <span class="card-subtext" style="margin-top:2px;"><i class="fa-solid fa-location-crosshairs"></i> Relative to True North</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="analytics-container">
+        <div class="analytics-header">
+            <div class="analytics-title"><i class="fa-solid fa-chart-line" style="color:var(--accent-blue);"></i> Historical Time-Series Analytics</div>
+            <div class="controls-group">
+                <button class="btn-gap-filter" onclick="toggleGapFilter()" style="padding: 6px 12px; font-size: 13px;">
+                    <i class="fa-solid fa-filter-slash"></i> Noise Filter: OFF
+                </button>
+                
+                <div class="time-select-wrapper">
+                    <label><i class="fa-solid fa-clock"></i> Window:</label>
+                    <select id="timeWindow" class="time-dropdown" onchange="adjustVisuals()">
+                        <option value="1">1 Min</option>
+                        <option value="5" selected>5 Min</option>
+                        <option value="15">15 Min</option>
+                    </select>
+                </div>
+
+                <button onclick="calculateLiveAverages()" class="btn-success" style="padding: 6px 12px; font-size: 13px;">
+                    <i class="fa-solid fa-calculator"></i> Calculate Averages
+                </button>
+                
+                <div class="time-select-wrapper">
+                    <label><i class="fa-solid fa-wave-square"></i> Vib Scale:</label>
+                    <select id="scale-vib" class="time-dropdown" onchange="adjustVisuals()">
+                        <option value="auto">Auto</option>
+                        <option value="1">0-1g</option>
+                        <option value="5" selected>0-5g</option>
+                        <option value="50">0-50g</option>
+                    </select>
+                </div>
+            
+                <div class="time-select-wrapper">
+                    <label><i class="fa-solid fa-ruler"></i> Gap Axis:</label>
+                    <select id="scale-gap" class="time-dropdown" onchange="adjustVisuals()">
+                        <option value="auto" selected>Auto</option>
+                        <option value="0,10">0-10 cm</option>
+                        <option value="10,20">10-20 cm</option>
+                        <option value="20,30">20-30 cm</option>
+                        <option value="0,50">0-50 cm</option>
+                        <option value="0,100">0-100 cm</option>
+                    </select>
+                </div>
+            
+                <div class="time-select-wrapper">
+                    <label><i class="fa-solid fa-arrows-up-down-left-right"></i> IMU Axis:</label>
+                    <select id="scale-motion" class="time-dropdown" onchange="adjustVisuals()">
+                        <option value="auto" selected>Auto</option>
+                        <option value="2">±2g</option>
+                        <option value="4">±4g</option>
+                        <option value="8">±8g</option>
+                    </select>
+                </div>
+            
+                <div class="time-select-wrapper">
+                    <label><i class="fa-solid fa-angle-up"></i> Angle Axis:</label>
+                    <select id="scale-angle" class="time-dropdown" onchange="adjustVisuals()">
+                        <option value="auto">Auto</option>
+                        <option value="0,20">0 to 20°</option>
+                        <option value="-45,45">±45°</option>
+                        <option value="-90,90" selected>±90°</option>
+                        <option value="-180,180">±180°</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="averages-panel" style="display: none; margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border-color);">
+            <div class="analytics-title" id="avg-title" style="margin-bottom: 12px; color: var(--accent-green);"><i class="fa-solid fa-chart-pie"></i> Mean Averages</div>
+            <div class="avg-card-container" id="avg-container">
+                </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-box"><canvas id="chart-distance"></canvas></div>
+            <div class="chart-box"><canvas id="chart-displacement"></canvas></div>
+            <div class="chart-box"><canvas id="chart-motion"></canvas></div>
+            <div class="chart-box"><canvas id="chart-surface-vib"></canvas></div>
+            <div class="chart-box"><canvas id="chart-angles"></canvas></div>
+            <div class="chart-box"><canvas id="chart-moisture"></canvas></div>
+            <div class="chart-box"><canvas id="chart-env"></canvas></div>
+        </div>
+    </div>
+
+    <script>
+        const currentUser =
+  localStorage.getItem("auth.username") || "Unknown";
+
+const userElement =
+  document.getElementById("loggedUser");
+
+if (userElement) {
+  userElement.textContent = currentUser;
+}
+        if (localStorage.getItem("auth.isLoggedIn") !== "true") {
+  window.location.replace("login.html");
+  document.getElementById("loggedUser").textContent =
+localStorage.getItem("auth.username") || "Guest";
+
+function logout() {
+    localStorage.removeItem("auth.isLoggedIn");
+    localStorage.removeItem("auth.username");
+    localStorage.removeItem("auth.loginTime");
+    window.location.href = "login.html";
+}
+}
+        // === UPDATE YOUR FIREBASE CONFIG HERE ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCq2c_01h5L7tP09jwpTtF6Y2_2fro-1c",
+            databaseURL: "https://slope-stablity-monitering-default-rtdb.firebaseio.com/"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let dataHistory = [];
+        let chartDistance, chartDisplacement, chart1, chart2, chart3, chart4, chart5;
+        let map, mapMarker;
+        let initialLock = false; 
+        
+        let clientWatchdogTimestamp = Date.now();
+        
+        // Filter State Variables
+        let isGapFilterActive = false;
+
+        function toggleGapFilter() {
+            isGapFilterActive = !isGapFilterActive;
+            
+            // Sync all buttons on the page
+            const btns = document.querySelectorAll('.btn-gap-filter');
+            btns.forEach(btn => {
+                if (isGapFilterActive) {
+                    btn.innerHTML = '<i class="fa-solid fa-filter"></i> Noise Filter: ON';
+                    btn.style.background = 'var(--accent-purple)';
+                    btn.style.color = '#fff';
+                    btn.style.border = '1px solid var(--accent-purple)';
+                } else {
+                    btn.innerHTML = '<i class="fa-solid fa-filter-slash"></i> Noise Filter: OFF';
+                    btn.style.background = '#1e293b';
+                    btn.style.color = 'var(--text-secondary)';
+                    btn.style.border = '1px solid var(--border-color)';
+                }
+            });
+            
+            // Adjust Line Styling on Chart
+            if(isGapFilterActive) {
+                chartDistance.data.datasets[0].borderColor = 'rgba(148, 163, 184, 0.3)';
+                chartDistance.data.datasets[0].backgroundColor = 'transparent';
+                chartDistance.data.datasets[1].hidden = false;
+            } else {
+                chartDistance.data.datasets[0].borderColor = '#a855f7';
+                chartDistance.data.datasets[0].backgroundColor = 'rgba(168, 85, 247, 0.15)';
+                chartDistance.data.datasets[1].hidden = true;
+            }
+            
+            // Force a re-render so live UI updates
+            renderFilteredCharts();
+            
+            // Update the Top Hero card and Visualizer immediately
+            if(dataHistory.length > 0) {
+                const latestData = dataHistory[dataHistory.length - 1];
+                let displayVal = parseFloat(latestData.raw.telemetry?.tofGapCm) || 0;
+                if(isGapFilterActive) {
+                    const subset = dataHistory.slice(-50); 
+                    let tempEma = null;
+                    subset.forEach(item => {
+                        let v = parseFloat(item.raw.telemetry?.tofGapCm) || 0;
+                        if(tempEma === null) tempEma = v;
+                        tempEma = (0.15 * v) + (0.85 * tempEma);
+                    });
+                    displayVal = Math.round(tempEma / 0.2) * 0.2;
+                }
+                document.getElementById('hero-gap').innerText = displayVal.toFixed(1) + ' cm';
+                document.getElementById('vis-gap-text').innerText = displayVal.toFixed(1) + ' cm';
+                const visualGapPixels = 20 + (displayVal * 2); 
+                document.getElementById('vis-gap-container').style.width = Math.min(visualGapPixels, 200) + 'px';
+            }
+        }
+
+        function initMap() {
+            map = L.map('map').setView([20.2961, 85.8245], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
+            mapMarker = L.marker([20.2961, 85.8245]).addTo(map).bindPopup('<b>Stability Node Matrix</b>').openPopup();
+        }
+
+        function initCharts() {
+            const baseOptions = { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'category', grid: { color: '#1e293b' }, ticks: { color: '#64748b' } } }, plugins: { legend: { labels: { color: '#f1f5f9', font: { size: 11 } } } } };
+
+            // Chart 1: Distance
+            chartDistance = new Chart(document.getElementById('chart-distance').getContext('2d'), { 
+                type: 'line', 
+                data: { labels: [], datasets: [
+                    { label: 'Raw Distance (cm)', data: [], borderColor: '#a855f7', borderWidth: 2, fill: true, backgroundColor: 'rgba(168, 85, 247, 0.15)', pointRadius: 0 },
+                    { label: 'Filtered Distance 2mm (cm)', data: [], borderColor: '#38bdf8', borderWidth: 2.5, fill: false, pointRadius: 1, hidden: true }
+                ]}, 
+                options: { ...baseOptions, scales: { ...baseOptions.scales, y: { grid: { color: '#1e293b' } } } } 
+            });
+
+            // Chart 2: Displacement
+            chartDisplacement = new Chart(document.getElementById('chart-displacement').getContext('2d'), { 
+                type: 'line', 
+                data: { labels: [], datasets: [
+                    { label: 'Crack Gap / Displacement (cm)', data: [], borderColor: '#10b981', borderWidth: 2, fill: true, backgroundColor: 'rgba(16, 185, 129, 0.15)', pointRadius: 0 }
+                ]}, 
+                options: { ...baseOptions, scales: { ...baseOptions.scales, y: { min: 0, max: 6, grid: { color: '#1e293b' } } } } 
+            });
+
+            chart1 = new Chart(document.getElementById('chart-motion').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ label: 'Ax', data: [], borderColor: '#38bdf8', borderWidth: 1.5, pointRadius: 0 }, { label: 'Ay', data: [], borderColor: '#a855f7', borderWidth: 1.5, pointRadius: 0 }, { label: 'Az', data: [], borderColor: '#ec4899', borderWidth: 1.5, pointRadius: 0 }]}, options: { ...baseOptions, scales: { ...baseOptions.scales, y: { grid: { color: '#1e293b' } } } } });
+            chart5 = new Chart(document.getElementById('chart-surface-vib').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ label: 'Vibration Index (g)', data: [], borderColor: '#ef4444', borderWidth: 2, fill: true, backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}, options: { ...baseOptions, scales: { ...baseOptions.scales, y: { min: 0, max: 5, grid: { color: '#1e293b' } } } } });
+            chart2 = new Chart(document.getElementById('chart-angles').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ label: 'Pitch (°)', data: [], borderColor: '#f59e0b', borderWidth: 1.8, pointRadius: 1 }, { label: 'Roll (°)', data: [], borderColor: '#10b981', borderWidth: 1.8, pointRadius: 1 }]}, options: { ...baseOptions, scales: { ...baseOptions.scales, y: { grid: { color: '#1e293b' } } } } });
+            chart3 = new Chart(document.getElementById('chart-moisture').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ label: 'Rain (%)', data: [], borderColor: '#6366f1', borderWidth: 2 }, { label: 'Soil (%)', data: [], borderColor: '#06b6d4', borderWidth: 2 }]}, options: { ...baseOptions, scales: { ...baseOptions.scales, y: { min: 0, max: 100, grid: { color: '#1e293b' } } } } });
+            chart4 = new Chart(document.getElementById('chart-env').getContext('2d'), { type: 'line', data: { labels: [], datasets: [{ label: 'Temp (°C)', data: [], borderColor: '#ef4444', yAxisID: 'y' }, { label: 'Hum (%)', data: [], borderColor: '#10b981', yAxisID: 'y1' }]}, options: { ...baseOptions, scales: { ...baseOptions.scales, y: { min: 10, max: 90, position: 'left' }, y1: { min: 10, max: 100, position: 'right', drawOnChartArea: false } } } });
+        }
+
+        initMap(); initCharts();
+
+        database.ref('/live_status').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
+            
+            clientWatchdogTimestamp = Date.now();
+            const now = new Date();
+            
+            dataHistory.push({ timestamp: now, timeLabel: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), raw: data });
+            
+            const currentLoraStatus = data.telemetry?.loraStatus || 'ONLINE';
+            const netBadge = document.getElementById('network-badge');
+            const sysMode = document.getElementById('system-mode');
+            
+            if (currentLoraStatus === 'OFFLINE') {
+                netBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> LORA DISCONNECTED';
+                netBadge.style.color = 'var(--accent-danger)';
+                sysMode.innerText = 'OFFLINE';
+                sysMode.style.background = 'var(--accent-danger)';
+            } else {
+                netBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> LIVE';
+                netBadge.style.color = 'var(--accent-green)';
+                sysMode.innerText = 'ACTIVE';
+                sysMode.style.background = '#2563eb';
+            }
+
+            const currentLat = parseFloat(data.telemetry?.latitude);
+            const currentLng = parseFloat(data.telemetry?.longitude);
+            document.getElementById('val-lat').innerText = "Lat: " + (isNaN(currentLat) ? '--' : currentLat.toFixed(6));
+            document.getElementById('val-lng').innerText = "Lng: " + (isNaN(currentLng) ? '--' : currentLng.toFixed(6));
+
+            if (!isNaN(currentLat) && !isNaN(currentLng) && currentLat !== 0 && currentLng !== 0) {
+                const livePosition = [currentLat, currentLng];
+                mapMarker.setLatLng(livePosition);
+                if (!initialLock) { map.setView(livePosition, 16); initialLock = true; } 
+                else { map.panTo(livePosition); }
+            }
+
+            let rawGapCm = parseFloat(data.telemetry?.tofGapCm) || 0;
+            let displayVal = rawGapCm;
+            
+            if(isGapFilterActive && dataHistory.length > 0) {
+                const subset = dataHistory.slice(-50); 
+                let tempEma = null;
+                subset.forEach(item => {
+                    let v = parseFloat(item.raw.telemetry?.tofGapCm) || 0;
+                    if(tempEma === null) tempEma = v;
+                    tempEma = (0.15 * v) + (0.85 * tempEma);
+                });
+                displayVal = Math.round(tempEma / 0.2) * 0.2;
+            }
+
+            const vibIndex = parseFloat(data.alerts?.surfaceVibrationIndex) || 0;
+            const gpsDist = parseFloat(data.telemetry?.gpsDistance) || 0;
+
+            document.getElementById('hero-gap').innerText = displayVal.toFixed(1) + ' cm';
+            document.getElementById('hero-dist').innerText = gpsDist.toFixed(2) + ' m';
+            document.getElementById('hero-dir').innerText = data.telemetry?.slipDirection || 'STABLE';
+            document.getElementById('val-pitch').innerText = (data.telemetry?.pitch || '--') + " deg";
+            document.getElementById('val-roll').innerText = (data.telemetry?.roll || '--') + " deg";
+            document.getElementById('val-surf-vib').innerText = vibIndex.toFixed(2);
+            document.getElementById('val-rain').innerText = (data.environment?.rainLevel || '--') + " %";
+            document.getElementById('val-soil').innerText = (data.environment?.soilMoisture || '--') + " %";
+            document.getElementById('val-temp').innerText = (data.environment?.temperature || '--') + " °C";
+            document.getElementById('val-hum').innerText = "RH: " + (data.environment?.humidity || '--') + " %";
+            document.getElementById('val-alt-rel').innerText = (data.telemetry?.relativeAltitude || '--') + " m";
+            document.getElementById('val-alt-abs').innerText = "Abs Sea Lvl: " + (data.telemetry?.seaLevelAltitude || '--') + " m";
+            document.getElementById('last-update').innerText = now.toLocaleTimeString();
+
+            const headingAngle = parseFloat(data.telemetry?.heading) || 0;
+            document.getElementById('compass-needle').style.transform = `rotate(${headingAngle}deg)`;
+            const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+            document.getElementById('lbl-heading').innerText = `${headingAngle.toFixed(1)}° ${dirs[Math.floor((headingAngle + 22.5) / 45.0) % 8]}`;
+
+            document.getElementById('vis-gap-text').innerText = displayVal.toFixed(1) + ' cm';
+            document.getElementById('vis-vib-text').innerText = 'Vib: ' + vibIndex.toFixed(2) + ' g';
+            document.getElementById('vis-gps-text').innerText = 'GPS Shift: ' + gpsDist.toFixed(2) + ' m';
+            
+            const visualGapPixels = 20 + (displayVal * 2); 
+            document.getElementById('vis-gap-container').style.width = Math.min(visualGapPixels, 200) + 'px';
+
+            const unstableBlock = document.getElementById('vis-unstable-block');
+            if (vibIndex > 0.5) {
+                unstableBlock.classList.add('shaking');
+                unstableBlock.style.animationDuration = Math.max(0.1, (1.0 / vibIndex)) + 's'; 
+            } else {
+                unstableBlock.classList.remove('shaking');
+            }
+
+            updateThreatCard('alert-tof', 'lbl-tof', data.alerts?.tofAlarm === "ALERT", "GAP WIDENING EXCEEDS 50CM", "GAP STABLE");
+            updateThreatCard('alert-fall', 'lbl-fall', data.alerts?.benchStatus === "UNSTABLE", "0.5G SHOCK! BENCH UNSTABLE", "NODE STABLE");
+            updateThreatCard('alert-tilt', 'lbl-tilt', data.alerts?.tiltAlert === "ALERT", "TILT SLOPE EXCEEDED", "GRADIENT STABLE");
+            updateThreatCard('alert-vibration', 'lbl-vib', data.alerts?.undergroundVibration === "Yes", "SEISMIC WAVE ALERT", "KINETIC MATRIX OK");
+            
+            renderFilteredCharts();
+        });
+
+        setInterval(() => {
+            if (Date.now() - clientWatchdogTimestamp > 20000) { 
+                document.getElementById('network-badge').innerHTML = '<i class="fa-solid fa-wifi"></i> ESP RECEIVER OFFLINE';
+                document.getElementById('network-badge').style.color = 'var(--text-secondary)';
+                document.getElementById('system-mode').innerText = 'OFFLINE';
+                document.getElementById('system-mode').style.background = 'var(--text-secondary)';
+            }
+        }, 5000);
+
+        function renderFilteredCharts() {
+            const windowMinutes = parseInt(document.getElementById('timeWindow').value) || 5;
+            const cutoffTime = new Date(new Date().getTime() - windowMinutes * 60 * 1000);
+            const subset = dataHistory.filter(item => item.timestamp >= cutoffTime);
+            const labels = subset.map(item => item.timeLabel);
+            
+            const scaleVib = document.getElementById('scale-vib').value;
+            const scaleGap = document.getElementById('scale-gap').value;
+            const scaleMotion = document.getElementById('scale-motion').value;
+            const scaleAngle = document.getElementById('scale-angle').value;
+        
+            chart5.options.scales.y.min = 0;
+            chart5.options.scales.y.max = scaleVib === 'auto' ? null : parseFloat(scaleVib);
+            
+            if (scaleGap === 'auto') {
+                chartDistance.options.scales.y.min = 0; chartDistance.options.scales.y.max = null;
+            } else {
+                const parts = scaleGap.split(',');
+                chartDistance.options.scales.y.min = parseFloat(parts[0]); chartDistance.options.scales.y.max = parseFloat(parts[1]);
+            }
+            
+            if (scaleMotion === 'auto') {
+                chart1.options.scales.y.min = null; chart1.options.scales.y.max = null;
+            } else {
+                chart1.options.scales.y.min = -parseFloat(scaleMotion); chart1.options.scales.y.max = parseFloat(scaleMotion);
+            }
+            
+            if (scaleAngle === 'auto') {
+                chart2.options.scales.y.min = null; chart2.options.scales.y.max = null;
+            } else {
+                const parts = scaleAngle.split(',');
+                chart2.options.scales.y.min = parseFloat(parts[0]); chart2.options.scales.y.max = parseFloat(parts[1]);
+            }
+        
+            // --- Live EMA Math Calculation ---
+            let tempEma = null;
+            const rawGapData = subset.map(item => parseFloat(item.raw.telemetry?.tofGapCm) || 0);
+            const filteredGapData = rawGapData.map(val => {
+                if (tempEma === null) tempEma = val;
+                tempEma = (0.15 * val) + (0.85 * tempEma);
+                return Math.round(tempEma / 0.2) * 0.2;
+            });
+
+            // --- Displacement Math Calculation ---
+            let currentInitialDistance = subset.length > 0 ? (parseFloat(subset[0].raw.telemetry?.tofGapCm) || 0) : 0;
+            const displacementData = rawGapData.map(val => Math.abs(currentInitialDistance - val));
+
+            chartDistance.data.labels = labels;
+            chartDistance.data.datasets[0].data = rawGapData;
+            chartDistance.data.datasets[1].data = filteredGapData;
+
+            chartDisplacement.data.labels = labels;
+            chartDisplacement.data.datasets[0].data = displacementData;
+        
+            chart1.data.labels = labels;
+            chart1.data.datasets[0].data = subset.map(item => parseFloat(item.raw.imu?.ax) || 0);
+            chart1.data.datasets[1].data = subset.map(item => parseFloat(item.raw.imu?.ay) || 0);
+            chart1.data.datasets[2].data = subset.map(item => parseFloat(item.raw.imu?.az) || 0);
+            
+            chart5.data.labels = labels; 
+            chart5.data.datasets[0].data = subset.map(item => parseFloat(item.raw.alerts?.surfaceVibrationIndex) || 0);
+            
+            chart2.data.labels = labels; 
+            chart2.data.datasets[0].data = subset.map(item => parseFloat(item.raw.telemetry?.pitch) || 0); 
+            chart2.data.datasets[1].data = subset.map(item => parseFloat(item.raw.telemetry?.roll) || 0);
+            
+            chart3.data.labels = labels; 
+            chart3.data.datasets[0].data = subset.map(item => parseFloat(item.raw.environment?.rainLevel) || 0); 
+            chart3.data.datasets[1].data = subset.map(item => parseFloat(item.raw.environment?.soilMoisture) || 0);
+            
+            chart4.data.labels = labels; 
+            chart4.data.datasets[0].data = subset.map(item => parseFloat(item.raw.environment?.temperature) || 0); 
+            chart4.data.datasets[1].data = subset.map(item => parseFloat(item.raw.environment?.humidity) || 0);
+        
+            [chartDistance, chartDisplacement, chart1, chart2, chart3, chart4, chart5].forEach(c => c.update('none'));
+            if(dataHistory.length > 2000) dataHistory.shift();
+        }
+
+        // Calculates Averages across current visible time window
+        function calculateLiveAverages() {
+            const windowMinutes = parseInt(document.getElementById('timeWindow').value) || 5;
+            const cutoffTime = new Date(new Date().getTime() - windowMinutes * 60 * 1000);
+            const subset = dataHistory.filter(item => item.timestamp >= cutoffTime);
+
+            if (subset.length === 0) {
+                alert("No data available in the current window to calculate averages.");
+                return;
+            }
+
+            const initialDist = parseFloat(subset[0].raw.telemetry?.tofGapCm) || 0;
+            const sums = { distance: 0, displacement: 0, ax: 0, ay: 0, az: 0, vib: 0, pitch: 0, roll: 0, rain: 0, soil: 0, temp: 0, hum: 0 };
+
+            subset.forEach(item => {
+                const dist = parseFloat(item.raw.telemetry?.tofGapCm) || 0;
+                sums.distance += dist;
+                sums.displacement += Math.abs(initialDist - dist);
+                sums.ax += parseFloat(item.raw.imu?.ax) || 0;
+                sums.ay += parseFloat(item.raw.imu?.ay) || 0;
+                sums.az += parseFloat(item.raw.imu?.az) || 0;
+                sums.vib += parseFloat(item.raw.alerts?.surfaceVibrationIndex) || 0;
+                sums.pitch += parseFloat(item.raw.telemetry?.pitch) || 0;
+                sums.roll += parseFloat(item.raw.telemetry?.roll) || 0;
+                sums.rain += parseFloat(item.raw.environment?.rainLevel) || 0;
+                sums.soil += parseFloat(item.raw.environment?.soilMoisture) || 0;
+                sums.temp += parseFloat(item.raw.environment?.temperature) || 0;
+                sums.hum += parseFloat(item.raw.environment?.humidity) || 0;
+            });
+
+            const count = subset.length;
+            const averages = {};
+            for (let key in sums) { 
+                averages[key] = (sums[key] / count).toFixed(2); 
+            }
+
+            document.getElementById('avg-title').innerHTML = `<i class="fa-solid fa-chart-pie"></i> Mean Averages (${count} Data Points) | Last ${windowMinutes} Min`;
+
+            const htmlCards = `
+                <div class="avg-card"><span>Distance from Ref</span><strong>${averages.distance} cm</strong></div>
+                <div class="avg-card"><span>Crack Gap (Displacement)</span><strong>${averages.displacement} cm</strong></div>
+                <div class="avg-card"><span>Motion (Ax, Ay, Az)</span><strong>${averages.ax}, ${averages.ay}, ${averages.az}</strong></div>
+                <div class="avg-card"><span>Vibration</span><strong>${averages.vib} g</strong></div>
+                <div class="avg-card"><span>Angles (Pitch, Roll)</span><strong>${averages.pitch}°, ${averages.roll}°</strong></div>
+                <div class="avg-card"><span>Moisture (Rain, Soil)</span><strong>${averages.rain}%, ${averages.soil}%</strong></div>
+                <div class="avg-card"><span>Environment (Temp, Hum)</span><strong>${averages.temp}°C, ${averages.hum}%</strong></div>
+            `;
+
+            document.getElementById('avg-container').innerHTML = htmlCards;
+            document.getElementById('averages-panel').style.display = 'block';
+        }
+
+        function adjustVisuals() { 
+            document.getElementById('averages-panel').style.display = 'none'; // Clear old averages
+            renderFilteredCharts(); 
+        }
+
+        function updateThreatCard(cardId, labelId, isActive, threatMsg, clearMsg) {
+            const cardElement = document.getElementById(cardId);
+            const labelElement = document.getElementById(labelId);
+            if (isActive) { cardElement.classList.add('danger-active'); labelElement.innerText = threatMsg; } 
+            else { cardElement.classList.remove('danger-active'); labelElement.innerText = clearMsg; }
+        }
+    function logout() {
+  localStorage.removeItem("auth.isLoggedIn");
+  localStorage.removeItem("auth.username");
+  window.location.replace("login.html");
+}
+function logout() {
+
+  const confirmed = confirm(
+    "Are you sure you want to logout?"
+  );
+
+  if (!confirmed) return;
+
+  localStorage.removeItem(
+    "auth.isLoggedIn"
+  );
+
+  localStorage.removeItem(
+    "auth.username"
+  );
+
+  window.location.replace(
+    "login.html"
+  );
+}
+const loginTime =
+  Number(localStorage.getItem("auth.loginTime"));
+
+const MAX_SESSION =
+  24 * 60 * 60 * 1000;
+
+if (
+  !loginTime ||
+  Date.now() - loginTime > MAX_SESSION
+) {
+  localStorage.clear();
+  window.location.replace("login.html");
+}
+    </script>
+</body>
+</html>

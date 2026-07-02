@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historical Data Archive</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #151f32;
+            --border-color: #24344d;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-purple: #a855f7;
+            --accent-warn: #f59e0b;
+            --accent-green: #10b981;
+        }
+        
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-primary); padding: 24px; min-height: 100vh; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 24px; }
+        h1 { font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        h1 i { color: var(--accent-purple); }
+
+        .control-panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 20px; }
+        .control-row { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+        .control-row:last-child { border-bottom: none; padding-bottom: 0; }
+        
+        .section-title { width: 100%; font-size: 14px; font-weight: 700; color: var(--accent-blue); text-transform: uppercase; letter-spacing: 1px; margin-bottom: -10px; }
+        
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+        
+        input[type="datetime-local"], select, input[type="number"] { background: #0e1626; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 6px; outline: none; font-size: 14px; }
+        input[type="datetime-local"] { color-scheme: dark; }
+        input[type="number"] { width: 120px; }
+        
+        button { background: var(--accent-blue); color: #0b0f19; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; height: 38px; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:disabled { background: #334155; cursor: not-allowed; color: #94a3b8; }
+        .btn-secondary { background: #1e293b; color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-warning { background: var(--accent-warn); color: #0b0f19; }
+        .btn-success { background: var(--accent-green); color: #0b0f19; }
+
+        .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; }
+        .chart-box { background: var(--bg-card); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; height: 400px; display: flex; flex-direction: column; }
+        .canvas-container { position: relative; flex-grow: 1; width: 100%; min-height: 0; }
+        
+        #loading { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(11, 15, 25, 0.9); padding: 30px; border-radius: 10px; border: 1px solid var(--border-color); text-align: center; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .spinner { border: 4px solid #1e293b; border-top: 4px solid var(--accent-purple); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .chart-hint { font-size: 11px; color: var(--text-secondary); text-align: center; margin-top: 8px; font-style: italic; }
+
+        /* Styles for the averages display */
+        .avg-card-container { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 15px; }
+        .avg-card { background: #1e293b; border: 1px solid var(--border-color); padding: 12px 16px; border-radius: 6px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
+        .avg-card span { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; font-weight: bold; }
+        .avg-card strong { color: var(--accent-blue); font-size: 16px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            Historical Data Archive
+        </h1>
+
+        <p style="
+        font-size:13px;
+        color:var(--text-secondary);
+        margin-top:4px;">
+            Querying Google Sheets Database (Max 48 Hrs)
+        </p>
+    </div>
+
+    <div style="
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;">
+
+        <!-- Back to Live Dashboard -->
+        <button
+            onclick="window.location.href='dashboard1.html'"
+            style="
+            background:var(--accent-purple);
+            color:white;
+            border:none;
+            padding:8px 16px;
+            border-radius:6px;
+            font-weight:600;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            gap:6px;">
+            <i class="fa-solid fa-chart-line"></i>
+            Live Dashboard
+        </button>
+
+        <!-- User -->
+        <div class="avg-card"
+             style="
+             min-width:140px;
+             padding:8px 12px;
+             margin:0;">
+            <span>User</span>
+            <strong id="loggedUser">---</strong>
+        </div>
+
+        <!-- Logout -->
+        <button
+            onclick="logout()"
+            style="
+            background:#ef4444;
+            color:white;
+            border:none;
+            padding:8px 16px;
+            border-radius:6px;
+            font-weight:600;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            gap:6px;">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            Logout
+        </button>
+
+    </div>
+</header>
+
+    <div class="control-panel">
+        <div class="control-row">
+            <div class="section-title"><i class="fa-solid fa-database"></i> 1. Time Series Query</div>
+            <div class="input-group">
+                <label for="startTime">Start Time</label>
+                <input type="datetime-local" id="startTime">
+            </div>
+            <div class="input-group">
+                <label for="endTime">End Time</label>
+                <input type="datetime-local" id="endTime">
+            </div>
+            <button id="fetchBtn" onclick="fetchData()"><i class="fa-solid fa-cloud-arrow-down"></i> Load Data</button>
+            
+            <button id="btn-calc-avg" onclick="calculateAverages()" class="btn-success">
+                <i class="fa-solid fa-calculator"></i> Calculate Averages
+            </button>
+
+            <button id="btn-hist-filter" onclick="toggleHistoryFilter()" class="btn-secondary" style="margin-left: auto;">
+                <i class="fa-solid fa-filter-slash"></i> Noise Filter: OFF
+            </button>
+        </div>
+
+        <div class="control-row">
+            <div class="section-title"><i class="fa-solid fa-magnifying-glass-chart"></i> 2. Precise Magnitude Analysis</div>
+            <div class="input-group">
+                <label for="scaleChart">Target Chart</label>
+                <select id="scaleChart">
+                    <option value="distance">Distance from Reference Point</option>
+                    <option value="displacement">Crack Gap / Displacement</option>
+                    <option value="motion">IMU Motion (Ax, Ay, Az)</option>
+                    <option value="vib">Surface Vibration Index</option>
+                    <option value="angles">Angles (Pitch/Roll)</option>
+                    <option value="moisture">Moisture & Rain</option>
+                    <option value="env">Environment (Temp/Hum)</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="yMin">Y-Axis Min</label>
+                <input type="number" id="yMin" step="0.01" placeholder="Auto">
+            </div>
+            <div class="input-group">
+                <label for="yMax">Y-Axis Max</label>
+                <input type="number" id="yMax" step="0.01" placeholder="Auto">
+            </div>
+            <button onclick="applyManualScale()"><i class="fa-solid fa-ruler-vertical"></i> Apply Limits</button>
+            <button class="btn-warning" onclick="resetAllViews()"><i class="fa-solid fa-expand"></i> Reset View & Zoom</button>
+        </div>
+    </div>
+
+    <div id="averages-panel" class="control-panel" style="display: none; padding-top: 15px;">
+        <div class="section-title" id="avg-title"><i class="fa-solid fa-chart-pie"></i> Averages for Selected Period</div>
+        <div class="avg-card-container" id="avg-container">
+            </div>
+    </div>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        <p style="font-weight: 600;">Fetching from Google Sheets...</p>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-box">
+            <div class="canvas-container"><canvas id="chart-distance"></canvas></div>
+            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+        </div>
+        
+        <div class="chart-box">
+            <div class="canvas-container"><canvas id="chart-displacement"></canvas></div>
+            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+        </div>
+
+        <div class="chart-box">
+            <div class="canvas-container"><canvas id="chart-motion"></canvas></div>
+            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+        </div>
+        <div class="chart-box">
+            <div class="canvas-container"><canvas id="chart-surface-vib"></canvas></div>
+            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+        </div>
+        <div class="chart-box">
+            <div class="canvas-container"><canvas id="chart-angles"></canvas></div>
+            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+        </div>
+        <div class="chart-box">
+            <div class="canvas-container"><canvas id="chart-moisture"></canvas></div>
+            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+        </div>
+        <div class="chart-box">
+            <div class="canvas-container"><canvas id="chart-env"></canvas></div>
+            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+        </div>
+    </div>
+
+    <script>
+        const currentUser =
+  localStorage.getItem("auth.username") || "Unknown";
+
+const userElement =
+  document.getElementById("loggedUser");
+
+if (userElement) {
+  userElement.textContent = currentUser;
+}
+        if (localStorage.getItem("auth.isLoggedIn") !== "true") {
+  window.location.replace("login.html");
+  document.getElementById("loggedUser").textContent =
+localStorage.getItem("auth.username") || "Guest";
+
+function logout() {
+    localStorage.removeItem("auth.isLoggedIn");
+    localStorage.removeItem("auth.username");
+    localStorage.removeItem("auth.loginTime");
+    window.location.href = "login.html";
+}
+}
+        // === PASTE YOUR GOOGLE WEB APP URL HERE ===
+        const scriptURL = "https://script.google.com/macros/s/AKfycbyGLOWfUZvoBfjuNUiMEs7qRDVW0r8EjKNOau_xp8yDLHeC-bpJtFxFTFh1JwpM8U9N0g/exec"; 
+        
+        let rawData = [];
+        let currentFilteredData = []; 
+        let currentInitialDistance = 0; // NEW: Store reference point for calculations
+        let charts = {};
+        
+        // Filter State
+        let isHistFilterActive = false;
+
+        window.onload = () => {
+            const now = new Date();
+            const twoDaysAgo = new Date(now.getTime() - (48 * 60 * 60 * 1000));
+            const formatTime = (date) => {
+                const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+                return (new Date(date - tzOffset)).toISOString().slice(0, 16);
+            };
+            document.getElementById('startTime').value = formatTime(twoDaysAgo);
+            document.getElementById('endTime').value = formatTime(now);
+            
+            initCharts();
+            fetchData(); 
+        };
+
+        function toggleHistoryFilter() {
+            isHistFilterActive = !isHistFilterActive;
+            const btn = document.getElementById('btn-hist-filter');
+            
+            if (isHistFilterActive) {
+                btn.innerHTML = '<i class="fa-solid fa-filter"></i> Noise Filter: ON (Comparing)';
+                btn.style.background = 'var(--accent-purple)';
+                btn.style.color = '#fff';
+                
+                charts.distance.data.datasets[0].borderColor = 'rgba(148, 163, 184, 0.3)';
+                charts.distance.data.datasets[0].backgroundColor = 'transparent';
+                charts.distance.data.datasets[1].hidden = false;
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-filter-slash"></i> Noise Filter: OFF';
+                btn.style.background = '#1e293b';
+                btn.style.color = 'var(--text-secondary)';
+                
+                charts.distance.data.datasets[0].borderColor = '#a855f7';
+                charts.distance.data.datasets[0].backgroundColor = 'rgba(168, 85, 247, 0.15)';
+                charts.distance.data.datasets[1].hidden = true;
+            }
+            charts.distance.update();
+        }
+
+        function initCharts() {
+            const baseOptions = { 
+                responsive: true, maintainAspectRatio: false, 
+                interaction: { mode: 'index', intersect: false },
+                scales: { x: { type: 'category', grid: { color: '#1e293b' }, ticks: { color: '#64748b' } }, y: { grid: { color: '#1e293b' } } }, 
+                plugins: { legend: { labels: { color: '#f1f5f9', font: { size: 11 } } }, zoom: { pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' } } } 
+            };
+
+            const createChart = (id, datasets, yMin, yMax) => {
+                const ctx = document.getElementById(id).getContext('2d');
+                let options = JSON.parse(JSON.stringify(baseOptions)); 
+                if(yMin !== undefined) options.scales.y.min = yMin;
+                if(yMax !== undefined) options.scales.y.max = yMax;
+                return new Chart(ctx, { type: 'line', data: { labels: [], datasets: datasets }, options: options });
+            };
+
+            // 1. Distance Chart (Formerly Crack Gap)
+            charts.distance = createChart('chart-distance', [
+                { label: 'Raw Distance (cm)', data: [], borderColor: '#a855f7', borderWidth: 2, fill: true, backgroundColor: 'rgba(168, 85, 247, 0.15)', pointRadius: 0 },
+                { label: 'Filtered Distance 2mm (cm)', data: [], borderColor: '#38bdf8', borderWidth: 2.5, fill: false, pointRadius: 1, hidden: true }
+            ]);
+
+            // 2. NEW: Displacement Chart (0 to 6 cm limit)
+            charts.displacement = createChart('chart-displacement', [
+                { label: 'Crack Gap / Displacement (cm)', data: [], borderColor: '#10b981', borderWidth: 2, fill: true, backgroundColor: 'rgba(16, 185, 129, 0.15)', pointRadius: 0 }
+            ], 0, 6);
+            
+            charts.motion = createChart('chart-motion', [{ label: 'Ax', data: [], borderColor: '#38bdf8', borderWidth: 1.5, pointRadius: 0 }, { label: 'Ay', data: [], borderColor: '#a855f7', borderWidth: 1.5, pointRadius: 0 }, { label: 'Az', data: [], borderColor: '#ec4899', borderWidth: 1.5, pointRadius: 0 }]);
+            charts.vib = createChart('chart-surface-vib', [{ label: 'Vibration Index (g)', data: [], borderColor: '#ef4444', borderWidth: 2, fill: true, backgroundColor: 'rgba(239, 68, 68, 0.15)', pointRadius: 0 }]);
+            charts.angles = createChart('chart-angles', [{ label: 'Pitch (°)', data: [], borderColor: '#f59e0b', borderWidth: 1.8, pointRadius: 0 }, { label: 'Roll (°)', data: [], borderColor: '#10b981', borderWidth: 1.8, pointRadius: 0 }]);
+            charts.moisture = createChart('chart-moisture', [{ label: 'Rain (%)', data: [], borderColor: '#6366f1', borderWidth: 2, pointRadius: 0 }, { label: 'Soil (%)', data: [], borderColor: '#06b6d4', borderWidth: 2, pointRadius: 0 }], 0, 100);
+            charts.env = createChart('chart-env', [{ label: 'Temp (°C)', data: [], borderColor: '#ef4444', pointRadius: 0 }, { label: 'Hum (%)', data: [], borderColor: '#10b981', pointRadius: 0 }]);
+        }
+
+        async function fetchData() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('fetchBtn').disabled = true;
+            document.getElementById('averages-panel').style.display = 'none'; 
+            
+            try {
+                const response = await fetch(scriptURL);
+                rawData = await response.json();
+                applyTimeFilter();
+            } catch (error) {
+                alert("Failed to load data.");
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('fetchBtn').disabled = false;
+            }
+        }
+
+        function applyTimeFilter() {
+            if (rawData.length === 0) return;
+            document.getElementById('averages-panel').style.display = 'none'; 
+
+            const start = new Date(document.getElementById('startTime').value).getTime();
+            const end = new Date(document.getElementById('endTime').value).getTime();
+
+            currentFilteredData = rawData.filter(item => {
+                const itemTime = new Date(item.timestamp).getTime();
+                return itemTime >= start && itemTime <= end;
+            });
+
+            if(currentFilteredData.length === 0) return;
+
+            const labels = currentFilteredData.map(item => new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+            // Grab the initial distance from the very first reading in the filtered range
+            currentInitialDistance = parseFloat(currentFilteredData[0].gap) || 0;
+
+            // Arrays for Distance
+            let ema = null;
+            const rawDistanceArray = currentFilteredData.map(i => parseFloat(i.gap) || 0);
+            const cleanDistanceArray = rawDistanceArray.map(raw => {
+                if (ema === null) ema = raw;
+                ema = (0.15 * raw) + (0.85 * ema);
+                return Math.round(ema / 0.2) * 0.2; 
+            });
+
+            // Array for Displacement (Absolute difference from initial starting point)
+            const displacementArray = rawDistanceArray.map(currentDist => {
+                return Math.abs(currentInitialDistance - currentDist);
+            });
+
+            // Update Chart 1
+            charts.distance.data.labels = labels;
+            charts.distance.data.datasets[0].data = rawDistanceArray;
+            charts.distance.data.datasets[1].data = cleanDistanceArray;
+
+            // Update Chart 2
+            charts.displacement.data.labels = labels;
+            charts.displacement.data.datasets[0].data = displacementArray;
+
+            charts.motion.data.labels = labels;
+            charts.motion.data.datasets[0].data = currentFilteredData.map(i => parseFloat(i.ax) || 0);
+            charts.motion.data.datasets[1].data = currentFilteredData.map(i => parseFloat(i.ay) || 0);
+            charts.motion.data.datasets[2].data = currentFilteredData.map(i => parseFloat(i.az) || 0);
+
+            charts.vib.data.labels = labels;
+            charts.vib.data.datasets[0].data = currentFilteredData.map(i => parseFloat(i.vib) || 0);
+
+            charts.angles.data.labels = labels;
+            charts.angles.data.datasets[0].data = currentFilteredData.map(i => parseFloat(i.pitch) || 0);
+            charts.angles.data.datasets[1].data = currentFilteredData.map(i => parseFloat(i.roll) || 0);
+
+            charts.moisture.data.labels = labels;
+            charts.moisture.data.datasets[0].data = currentFilteredData.map(i => parseFloat(i.rain) || 0);
+            charts.moisture.data.datasets[1].data = currentFilteredData.map(i => parseFloat(i.soil) || 0);
+
+            charts.env.data.labels = labels;
+            charts.env.data.datasets[0].data = currentFilteredData.map(i => parseFloat(i.temp) || 0);
+            charts.env.data.datasets[1].data = currentFilteredData.map(i => parseFloat(i.hum) || 0);
+
+            Object.values(charts).forEach(chart => chart.update('none'));
+        }
+
+        function calculateAverages() {
+            if (!currentFilteredData || currentFilteredData.length === 0) {
+                alert("No data available in the currently selected time range to calculate averages.");
+                return;
+            }
+
+            const keysToAverage = ['distance', 'displacement', 'ax', 'ay', 'az', 'vib', 'pitch', 'roll', 'rain', 'soil', 'temp', 'hum'];
+            const sums = {};
+            keysToAverage.forEach(k => sums[k] = 0);
+
+            currentFilteredData.forEach(item => {
+                const currentDist = parseFloat(item.gap) || 0;
+                
+                sums['distance'] += currentDist;
+                sums['displacement'] += Math.abs(currentInitialDistance - currentDist); // Calc on the fly
+                sums['ax'] += (parseFloat(item.ax) || 0);
+                sums['ay'] += (parseFloat(item.ay) || 0);
+                sums['az'] += (parseFloat(item.az) || 0);
+                sums['vib'] += (parseFloat(item.vib) || 0);
+                sums['pitch'] += (parseFloat(item.pitch) || 0);
+                sums['roll'] += (parseFloat(item.roll) || 0);
+                sums['rain'] += (parseFloat(item.rain) || 0);
+                sums['soil'] += (parseFloat(item.soil) || 0);
+                sums['temp'] += (parseFloat(item.temp) || 0);
+                sums['hum'] += (parseFloat(item.hum) || 0);
+            });
+
+            const count = currentFilteredData.length;
+            const averages = {};
+            keysToAverage.forEach(k => {
+                averages[k] = (sums[k] / count).toFixed(2);
+            });
+
+            const startTimeStr = new Date(document.getElementById('startTime').value).toLocaleString();
+            const endTimeStr = new Date(document.getElementById('endTime').value).toLocaleString();
+            document.getElementById('avg-title').innerHTML = `<i class="fa-solid fa-chart-pie"></i> Mean Averages (${count} Data Points) | ${startTimeStr} to ${endTimeStr}`;
+
+            const htmlCards = `
+                <div class="avg-card"><span>Distance from Ref</span><strong>${averages.distance} cm</strong></div>
+                <div class="avg-card"><span>Crack Gap (Displacement)</span><strong>${averages.displacement} cm</strong></div>
+                <div class="avg-card"><span>Motion (Ax, Ay, Az)</span><strong>${averages.ax}, ${averages.ay}, ${averages.az}</strong></div>
+                <div class="avg-card"><span>Vibration</span><strong>${averages.vib} g</strong></div>
+                <div class="avg-card"><span>Angles (Pitch, Roll)</span><strong>${averages.pitch}°, ${averages.roll}°</strong></div>
+                <div class="avg-card"><span>Moisture (Rain, Soil)</span><strong>${averages.rain}%, ${averages.soil}%</strong></div>
+                <div class="avg-card"><span>Environment (Temp, Hum)</span><strong>${averages.temp}°C, ${averages.hum}%</strong></div>
+            `;
+
+            document.getElementById('avg-container').innerHTML = htmlCards;
+            
+            const panel = document.getElementById('averages-panel');
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function applyManualScale() {
+            const target = document.getElementById('scaleChart').value;
+            const yMinInput = document.getElementById('yMin').value;
+            const yMaxInput = document.getElementById('yMax').value;
+            const chart = charts[target];
+            if(!chart) return;
+            if (yMinInput !== "") chart.options.scales.y.min = parseFloat(yMinInput); else delete chart.options.scales.y.min;
+            if (yMaxInput !== "") chart.options.scales.y.max = parseFloat(yMaxInput); else delete chart.options.scales.y.max;
+            chart.update();
+        }
+
+        function resetAllViews() {
+            document.getElementById('yMin').value = "";
+            document.getElementById('yMax').value = "";
+            Object.keys(charts).forEach(key => {
+                let chart = charts[key];
+                
+                // Keep default boundaries for certain charts
+                if (key === 'moisture') { chart.options.scales.y.min = 0; chart.options.scales.y.max = 100; } 
+                else if (key === 'displacement') { chart.options.scales.y.min = 0; chart.options.scales.y.max = 6; }
+                else { delete chart.options.scales.y.min; delete chart.options.scales.y.max; }
+                
+                chart.resetZoom();
+                chart.update();
+            });
+        }
+    function logout() {
+  localStorage.removeItem("auth.isLoggedIn");
+  localStorage.removeItem("auth.username");
+  window.location.replace("login.html");
+}
+function logout() {
+
+  const confirmed = confirm(
+    "Are you sure you want to logout?"
+  );
+
+  if (!confirmed) return;
+
+  localStorage.removeItem(
+    "auth.isLoggedIn"
+  );
+
+  localStorage.removeItem(
+    "auth.username"
+  );
+
+  window.location.replace(
+    "login.html"
+  );
+}
+const loginTime =
+  Number(localStorage.getItem("auth.loginTime"));
+
+const MAX_SESSION =
+  24 * 60 * 60 * 1000;
+
+if (
+  !loginTime ||
+  Date.now() - loginTime > MAX_SESSION
+) {
+  localStorage.clear();
+  window.location.replace("login.html");
+}
+    </script>
+</body>
+</html>
