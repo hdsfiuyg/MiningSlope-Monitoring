@@ -244,7 +244,7 @@ if (userElement) {
   userElement.textContent = currentUser;
 }
         if (localStorage.getItem("auth.isLoggedIn") !== "true") {
-  window.location.replace("login.html");
+  window.location.replace("index.html");
   document.getElementById("loggedUser").textContent =
 localStorage.getItem("auth.username") || "Guest";
 
@@ -522,7 +522,7 @@ function logout() {
   );
 
   window.location.replace(
-    "login.html"
+    "index.html"
   );
 }
 const loginTime =
@@ -536,7 +536,7 @@ if (
   Date.now() - loginTime > MAX_SESSION
 ) {
   localStorage.clear();
-  window.location.replace("login.html");
+  window.location.replace("index.html");
 }
     </script>
 </body>

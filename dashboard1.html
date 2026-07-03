@@ -1087,7 +1087,7 @@
         userElement.textContent = currentUser;
       }
       if (localStorage.getItem("auth.isLoggedIn") !== "true") {
-        window.location.replace("login.html");
+        window.location.replace("index.html");
         document.getElementById("loggedUser").textContent =
           localStorage.getItem("auth.username") || "Guest";
 
@@ -1853,7 +1853,7 @@
 
         localStorage.removeItem("auth.username");
 
-        window.location.replace("login.html");
+        window.location.replace("index.html");
       }
       const loginTime = Number(localStorage.getItem("auth.loginTime"));
 
@@ -1861,7 +1861,7 @@
 
       if (!loginTime || Date.now() - loginTime > MAX_SESSION) {
         localStorage.clear();
-        window.location.replace("login.html");
+        window.location.replace("index.html");
       }
     </script>
   </body>
