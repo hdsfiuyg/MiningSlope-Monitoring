@@ -252,7 +252,7 @@ function logout() {
     localStorage.removeItem("auth.isLoggedIn");
     localStorage.removeItem("auth.username");
     localStorage.removeItem("auth.loginTime");
-    window.location.href = "login.html";
+    window.location.href = "index.html";
 }
 }
         // === PASTE YOUR GOOGLE WEB APP URL HERE ===
@@ -501,9 +501,9 @@ function logout() {
             });
         }
     function logout() {
-  localStorage.removeItem("auth.isLoggedIn");
-  localStorage.removeItem("auth.username");
-  window.location.replace("login.html");
+    sessionStorage.clear();
+    localStorage.clear();
+    window.location.replace("/");
 }
 function logout() {
 
