@@ -991,6 +991,13 @@
           >
             <i class="fa-solid fa-bolt"></i> Simulate
           </button>
+          <button
+            onclick="fitCharts()"
+            class="btn-primary"
+            style="padding: 6px 12px; font-size: 13px; margin-left:8px"
+          >
+            <i class="fa-solid fa-arrows-alt"></i> Fit
+          </button>
 
           <div class="time-select-wrapper">
             <label><i class="fa-solid fa-wave-square"></i> Vib Scale:</label>
@@ -1464,6 +1471,8 @@
 
       initMap();
       initCharts();
+      // Ensure charts fit available screen space on load
+      if (typeof fitCharts === "function") fitCharts();
 
       function handleLiveData(data) {
         if (!data) return;
@@ -1943,6 +1952,42 @@
         // Feed the event to the same handler used by live data
         handleLiveData(event);
       }
+
+      // Adjust chart container heights and force Chart.js to resize/update
+      function fitCharts() {
+        const chartBoxes = document.querySelectorAll('.chart-box');
+        const container = document.querySelector('.charts-grid');
+        if (!container || chartBoxes.length === 0) return;
+
+        const width = container.clientWidth;
+        let columns = 1;
+        if (width > 1200) columns = 3;
+        else if (width > 800) columns = 2;
+
+        const chartsCount = chartBoxes.length;
+        const rows = Math.max(1, Math.ceil(chartsCount / columns));
+
+        const header = document.querySelector('.analytics-header');
+        const headerHeight = header ? header.offsetHeight : 200;
+        const footerPadding = 160; // room for other UI elements
+        const available = Math.max(window.innerHeight - headerHeight - footerPadding, 400);
+
+        const boxHeight = Math.max(200, Math.floor(available / rows) - 20);
+        chartBoxes.forEach(cb => cb.style.height = boxHeight + 'px');
+
+        // Trigger Chart.js resize/update for known charts
+        const charts = [chartDistance, chartDisplacement, chart1, chart2, chart3, chart4, chart5];
+        charts.forEach(c => {
+          if (c && typeof c.resize === 'function') {
+            try { c.resize(); c.update(); } catch (e) { /* ignore */ }
+          }
+        });
+      }
+
+      window.addEventListener('resize', () => {
+        // debounce-ish by scheduling next animation frame
+        window.requestAnimationFrame(fitCharts);
+      });
       function logout() {
         sessionStorage.clear();
         localStorage.clear();
