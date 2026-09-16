@@ -984,6 +984,14 @@
             <i class="fa-solid fa-calculator"></i> Calculate Averages
           </button>
 
+          <button
+            onclick="simulateTelemetry()"
+            class="btn-info"
+            style="padding: 6px 12px; font-size: 13px; margin-left:8px"
+          >
+            <i class="fa-solid fa-bolt"></i> Simulate
+          </button>
+
           <div class="time-select-wrapper">
             <label><i class="fa-solid fa-wave-square"></i> Vib Scale:</label>
             <select
@@ -1009,7 +1017,7 @@
               <option value="0,10">0-10 cm</option>
               <option value="10,20">10-20 cm</option>
               <option value="20,30">20-30 cm</option>
-              <option value="0,50">0-50 cm</option>
+              <option value="0,5">0-5 cm</option>
               <option value="0,100">0-100 cm</option>
             </select>
           </div>
@@ -1107,6 +1115,15 @@
 
       firebase.initializeApp(firebaseConfig);
       const database = firebase.database();
+
+      // Thresholds (used for visualization/alerts)
+      const THRESH_IMU_IMPACT = 4.91; // ~0.5g impact threshold
+      const THRESH_TILT_DEG = 5.0; // degrees
+      const THRESH_GPS_AGE_MS = 2000; // ms
+      const THRESH_GPS_SLIP_CM = 250.0; // cm
+      const THRESH_SURFACE_VIB = 3.0; // g
+      const THRESH_ALT_CHANGE_M = 0.4; // meters
+      const THRESH_TOF_GAP_CM = 5.0; // cm
 
       let dataHistory = [];
       let chartDistance,
@@ -1448,8 +1465,7 @@
       initMap();
       initCharts();
 
-      database.ref("/live_status").on("value", (snapshot) => {
-        const data = snapshot.val();
+      function handleLiveData(data) {
         if (!data) return;
 
         clientWatchdogTimestamp = Date.now();
@@ -1567,44 +1583,89 @@
           Math.min(visualGapPixels, 200) + "px";
 
         const unstableBlock = document.getElementById("vis-unstable-block");
-        if (vibIndex > 0.5) {
+        if (vibIndex >= THRESH_SURFACE_VIB) {
           unstableBlock.classList.add("shaking");
           unstableBlock.style.animationDuration =
-            Math.max(0.1, 1.0 / vibIndex) + "s";
+            Math.max(0.05, 1.0 / Math.max(0.1, vibIndex)) + "s";
         } else {
           unstableBlock.classList.remove("shaking");
         }
 
+        // Compute a few local alerts using the defined thresholds so the
+        // visualizer reflects the numeric policy even if upstream alerts
+        // are not set.
+        const refDist =
+          dataHistory.length > 0
+            ? parseFloat(dataHistory[0].raw.telemetry?.tofGapCm) || rawGapCm
+            : rawGapCm;
+        const gapDisp = Math.abs(displayVal - refDist);
+        const localTofAlert = gapDisp >= THRESH_TOF_GAP_CM;
+
+        const ax = parseFloat(data.telemetry?.imu?.ax) || parseFloat(data.telemetry?.ax) || 0;
+        const ay = parseFloat(data.telemetry?.imu?.ay) || parseFloat(data.telemetry?.ay) || 0;
+        const az = parseFloat(data.telemetry?.imu?.az) || parseFloat(data.telemetry?.az) || 0;
+        const impactMag = Math.sqrt(ax * ax + ay * ay + az * az);
+        const localImpactAlert = impactMag >= THRESH_IMU_IMPACT;
+
+        const pitch = parseFloat(data.telemetry?.pitch) || 0;
+        const roll = parseFloat(data.telemetry?.roll) || 0;
+        const localTiltAlert =
+          Math.abs(pitch) >= THRESH_TILT_DEG || Math.abs(roll) >= THRESH_TILT_DEG;
+
+        // GPS slip (gpsDist is in meters) — highlight if shifted more than threshold cm
+        const gpsSlipExceeded = gpsDist * 100 >= THRESH_GPS_SLIP_CM;
+        const heroDistEl = document.getElementById("hero-dist");
+        if (gpsSlipExceeded) {
+          heroDistEl.style.color = "var(--accent-danger)";
+        } else {
+          heroDistEl.style.color = "";
+        }
+
+        // Altitude sudden change
+        const currAlt = parseFloat(data.telemetry?.relativeAltitude) || 0;
+        const prevAlt =
+          dataHistory.length > 1
+            ? parseFloat(dataHistory[dataHistory.length - 2].raw.telemetry?.relativeAltitude) || currAlt
+            : currAlt;
+        const altExceeded = Math.abs(currAlt - prevAlt) >= THRESH_ALT_CHANGE_M;
+        const altEl = document.getElementById("val-alt-rel");
+        if (altExceeded) altEl.style.color = "var(--accent-danger)";
+        else altEl.style.color = "";
+
         updateThreatCard(
           "alert-tof",
           "lbl-tof",
-          data.alerts?.tofAlarm === "ALERT",
-          "GAP WIDENING EXCEEDS 50CM",
+          data.alerts?.tofAlarm === "ALERT" || localTofAlert,
+          "GAP WIDENING EXCEEDS 5CM",
           "GAP STABLE",
         );
         updateThreatCard(
           "alert-fall",
           "lbl-fall",
-          data.alerts?.benchStatus === "UNSTABLE",
-          "0.5G SHOCK! BENCH UNSTABLE",
+          data.alerts?.benchStatus === "UNSTABLE" || localImpactAlert,
+          "IMPACT SHOCK! BENCH UNSTABLE",
           "NODE STABLE",
         );
         updateThreatCard(
           "alert-tilt",
           "lbl-tilt",
-          data.alerts?.tiltAlert === "ALERT",
+          data.alerts?.tiltAlert === "ALERT" || localTiltAlert,
           "TILT SLOPE EXCEEDED",
           "GRADIENT STABLE",
         );
         updateThreatCard(
           "alert-vibration",
           "lbl-vib",
-          data.alerts?.undergroundVibration === "Yes",
+          data.alerts?.undergroundVibration === "Yes" || vibIndex >= THRESH_SURFACE_VIB,
           "SEISMIC WAVE ALERT",
           "KINETIC MATRIX OK",
         );
 
         renderFilteredCharts();
+      }
+
+      database.ref("/live_status").on("value", (snapshot) => {
+        handleLiveData(snapshot.val());
       });
 
       setInterval(() => {
@@ -1838,6 +1899,49 @@
           cardElement.classList.remove("danger-active");
           labelElement.innerText = clearMsg;
         }
+      }
+      
+      // Simulation helper to inject sample telemetry that exercises thresholds
+      function simulateTelemetry() {
+        // Push a baseline sample so previous values exist for comparisons
+        const baseline = {
+          telemetry: {
+            tofGapCm: 0.5,
+            gpsDistance: 0.0,
+            relativeAltitude: 0.0,
+            heading: 0,
+            latitude: 20.2961,
+            longitude: 85.8245,
+          },
+          alerts: { surfaceVibrationIndex: 0.1 },
+          environment: { temperature: 25, humidity: 50, rainLevel: 0, soilMoisture: 10 },
+        };
+
+        dataHistory.push({
+          timestamp: new Date(Date.now() - 2000),
+          timeLabel: new Date(Date.now() - 2000).toLocaleTimeString(),
+          raw: baseline,
+        });
+
+        // Create an event sample that exceeds multiple thresholds
+        const event = {
+          telemetry: {
+            tofGapCm: 7.2, // > THRESH_TOF_GAP_CM (5 cm)
+            gpsDistance: 3.5, // meters -> 350 cm > THRESH_GPS_SLIP_CM
+            relativeAltitude: 1.0, // altitude jump > THRESH_ALT_CHANGE_M
+            heading: 135,
+            latitude: 20.2965,
+            longitude: 85.8250,
+            pitch: 6.0,
+            roll: -6.5,
+            imu: { ax: 3.5, ay: 3.5, az: 1.0 },
+          },
+          alerts: { surfaceVibrationIndex: 3.2, undergroundVibration: "Yes" },
+          environment: { temperature: 24, humidity: 55, rainLevel: 10, soilMoisture: 20 },
+        };
+
+        // Feed the event to the same handler used by live data
+        handleLiveData(event);
       }
       function logout() {
         sessionStorage.clear();
