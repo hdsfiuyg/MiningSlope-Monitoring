@@ -22,7 +22,6 @@
             --accent-warn: #f59e0b;
             --accent-green: #10b981;
         }
-        
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
         body { background-color: var(--bg-main); color: var(--text-primary); padding: 24px; min-height: 100vh; }
@@ -61,7 +60,6 @@
         
         .chart-hint { font-size: 11px; color: var(--text-secondary); text-align: center; margin-top: 8px; font-style: italic; }
 
-        /* Styles for the averages display */
         .avg-card-container { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 15px; }
         .avg-card { background: #1e293b; border: 1px solid var(--border-color); padding: 12px 16px; border-radius: 6px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
         .avg-card span { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; font-weight: bold; }
@@ -70,75 +68,12 @@
 </head>
 <body>
 
-<header>
-    <div>
-        <h1>
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            Historical Data Archive
-        </h1>
-
-        <p style="
-        font-size:13px;
-        color:var(--text-secondary);
-        margin-top:4px;">
-            Querying Google Sheets Database (Max 48 Hrs)
-        </p>
-    </div>
-
-    <div style="
-    display:flex;
-    align-items:center;
-    gap:12px;
-    flex-wrap:wrap;">
-
-        <!-- Back to Live Dashboard -->
-        <button
-            onclick="window.location.href='dashboard1.html'"
-            style="
-            background:var(--accent-purple);
-            color:white;
-            border:none;
-            padding:8px 16px;
-            border-radius:6px;
-            font-weight:600;
-            cursor:pointer;
-            display:flex;
-            align-items:center;
-            gap:6px;">
-            <i class="fa-solid fa-chart-line"></i>
-            Live Dashboard
-        </button>
-
-        <!-- User -->
-        <div class="avg-card"
-             style="
-             min-width:140px;
-             padding:8px 12px;
-             margin:0;">
-            <span>User</span>
-            <strong id="loggedUser">---</strong>
+    <header>
+        <div>
+            <h1><i class="fa-solid fa-clock-rotate-left"></i> Historical Data Archive</h1>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Querying Google Sheets Database (Max 48 Hrs)</p>
         </div>
-
-        <!-- Logout -->
-        <button
-            onclick="logout()"
-            style="
-            background:#ef4444;
-            color:white;
-            border:none;
-            padding:8px 16px;
-            border-radius:6px;
-            font-weight:600;
-            cursor:pointer;
-            display:flex;
-            align-items:center;
-            gap:6px;">
-            <i class="fa-solid fa-right-from-bracket"></i>
-            Logout
-        </button>
-
-    </div>
-</header>
+    </header>
 
     <div class="control-panel">
         <div class="control-row">
@@ -187,12 +122,29 @@
             <button onclick="applyManualScale()"><i class="fa-solid fa-ruler-vertical"></i> Apply Limits</button>
             <button class="btn-warning" onclick="resetAllViews()"><i class="fa-solid fa-expand"></i> Reset View & Zoom</button>
         </div>
+
+        <div class="control-row">
+            <div class="section-title"><i class="fa-solid fa-arrows-up-down-left-right"></i> 3. Movement & Calibration Check</div>
+            <div class="input-group">
+                <label for="calibStartTime">Calibrated Time (Reference)</label>
+                <input type="datetime-local" id="calibStartTime">
+            </div>
+            <div class="input-group">
+                <label for="calibEndTime">End Time (Check Until)</label>
+                <input type="datetime-local" id="calibEndTime">
+            </div>
+            <button onclick="checkDeviceMovement()" class="btn-secondary" style="border-color: var(--accent-purple); color: var(--text-primary);">
+                <i class="fa-solid fa-satellite-dish"></i> Check Movement
+            </button>
+            
+            <div id="movementResult" style="display: none; padding: 10px 15px; border-radius: 6px; border: 1px solid var(--border-color); background: #0e1626; min-width: 250px;">
+                </div>
+        </div>
     </div>
 
     <div id="averages-panel" class="control-panel" style="display: none; padding-top: 15px;">
         <div class="section-title" id="avg-title"><i class="fa-solid fa-chart-pie"></i> Averages for Selected Period</div>
-        <div class="avg-card-container" id="avg-container">
-            </div>
+        <div class="avg-card-container" id="avg-container"></div>
     </div>
 
     <div id="loading">
@@ -203,64 +155,43 @@
     <div class="charts-grid">
         <div class="chart-box">
             <div class="canvas-container"><canvas id="chart-distance"></canvas></div>
-            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+            <div class="chart-hint">Scroll to zoom. Hold 'Ctrl' + Drag to pan left/right.</div>
         </div>
         
         <div class="chart-box">
             <div class="canvas-container"><canvas id="chart-displacement"></canvas></div>
-            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+            <div class="chart-hint">Scroll to zoom. Hold 'Ctrl' + Drag to pan left/right.</div>
         </div>
 
         <div class="chart-box">
             <div class="canvas-container"><canvas id="chart-motion"></canvas></div>
-            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+            <div class="chart-hint">Scroll to zoom. Hold 'Ctrl' + Drag to pan left/right.</div>
         </div>
         <div class="chart-box">
             <div class="canvas-container"><canvas id="chart-surface-vib"></canvas></div>
-            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+            <div class="chart-hint">Scroll to zoom. Hold 'Ctrl' + Drag to pan left/right.</div>
         </div>
         <div class="chart-box">
             <div class="canvas-container"><canvas id="chart-angles"></canvas></div>
-            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+            <div class="chart-hint">Scroll to zoom. Hold 'Ctrl' + Drag to pan left/right.</div>
         </div>
         <div class="chart-box">
             <div class="canvas-container"><canvas id="chart-moisture"></canvas></div>
-            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+            <div class="chart-hint">Scroll to zoom. Hold 'Ctrl' + Drag to pan left/right.</div>
         </div>
         <div class="chart-box">
             <div class="canvas-container"><canvas id="chart-env"></canvas></div>
-            <div class="chart-hint">Scroll to zoom. Drag to pan.</div>
+            <div class="chart-hint">Scroll to zoom. Hold 'Ctrl' + Drag to pan left/right.</div>
         </div>
     </div>
 
     <script>
-        const currentUser =
-  localStorage.getItem("auth.username") || "Unknown";
-
-const userElement =
-  document.getElementById("loggedUser");
-
-if (userElement) {
-  userElement.textContent = currentUser;
-}
-        if (localStorage.getItem("auth.isLoggedIn") !== "true") {
-  window.location.replace("index.html");
-  document.getElementById("loggedUser").textContent =
-localStorage.getItem("auth.username") || "Guest";
-
-function logout() {
-    localStorage.removeItem("auth.isLoggedIn");
-    localStorage.removeItem("auth.username");
-    localStorage.removeItem("auth.loginTime");
-    window.location.href = "index.html";
-}
-}
         // === PASTE YOUR GOOGLE WEB APP URL HERE ===
         const scriptURL = "https://script.google.com/macros/s/AKfycbyGLOWfUZvoBfjuNUiMEs7qRDVW0r8EjKNOau_xp8yDLHeC-bpJtFxFTFh1JwpM8U9N0g/exec"; 
         
         let rawData = [];
         let currentFilteredData = []; 
-        let currentInitialDistance = 0; // NEW: Store reference point for calculations
+        let currentInitialDistance = 0; 
         let charts = {};
         
         // Filter State
@@ -279,6 +210,14 @@ function logout() {
             initCharts();
             fetchData(); 
         };
+
+        // Initialize the calibration inputs to match the default time window
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                document.getElementById('calibStartTime').value = document.getElementById('startTime').value;
+                document.getElementById('calibEndTime').value = document.getElementById('endTime').value;
+            }, 100);
+        });
 
         function toggleHistoryFilter() {
             isHistFilterActive = !isHistFilterActive;
@@ -308,8 +247,15 @@ function logout() {
             const baseOptions = { 
                 responsive: true, maintainAspectRatio: false, 
                 interaction: { mode: 'index', intersect: false },
-                scales: { x: { type: 'category', grid: { color: '#1e293b' }, ticks: { color: '#64748b' } }, y: { grid: { color: '#1e293b' } } }, 
-                plugins: { legend: { labels: { color: '#f1f5f9', font: { size: 11 } } }, zoom: { pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' } } } 
+                scales: { 
+                    x: { type: 'category', grid: { color: '#1e293b' }, ticks: { color: '#64748b' } }, 
+                    y: { grid: { color: '#1e293b' } } 
+                }, 
+                plugins: { 
+                    legend: { labels: { color: '#f1f5f9', font: { size: 11 } } }, 
+                    // To remove the ctrl requirement, delete `, modifierKey: 'ctrl'` below
+                    zoom: { pan: { enabled: true, mode: 'x', modifierKey: 'ctrl' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } 
+                } 
             };
 
             const createChart = (id, datasets, yMin, yMax) => {
@@ -320,13 +266,11 @@ function logout() {
                 return new Chart(ctx, { type: 'line', data: { labels: [], datasets: datasets }, options: options });
             };
 
-            // 1. Distance Chart (Formerly Crack Gap)
             charts.distance = createChart('chart-distance', [
                 { label: 'Raw Distance (cm)', data: [], borderColor: '#a855f7', borderWidth: 2, fill: true, backgroundColor: 'rgba(168, 85, 247, 0.15)', pointRadius: 0 },
                 { label: 'Filtered Distance 2mm (cm)', data: [], borderColor: '#38bdf8', borderWidth: 2.5, fill: false, pointRadius: 1, hidden: true }
             ]);
 
-            // 2. NEW: Displacement Chart (0 to 6 cm limit)
             charts.displacement = createChart('chart-displacement', [
                 { label: 'Crack Gap / Displacement (cm)', data: [], borderColor: '#10b981', borderWidth: 2, fill: true, backgroundColor: 'rgba(16, 185, 129, 0.15)', pointRadius: 0 }
             ], 0, 6);
@@ -369,12 +313,17 @@ function logout() {
 
             if(currentFilteredData.length === 0) return;
 
-            const labels = currentFilteredData.map(item => new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+            // UPDATED: Create 2-line labels with Date (Line 1) and Time (Line 2)
+            const labels = currentFilteredData.map(item => {
+                const d = new Date(item.timestamp);
+                return [
+                    d.toLocaleDateString([], { month: 'short', day: 'numeric' }), 
+                    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                ];
+            });
 
-            // Grab the initial distance from the very first reading in the filtered range
             currentInitialDistance = parseFloat(currentFilteredData[0].gap) || 0;
 
-            // Arrays for Distance
             let ema = null;
             const rawDistanceArray = currentFilteredData.map(i => parseFloat(i.gap) || 0);
             const cleanDistanceArray = rawDistanceArray.map(raw => {
@@ -383,17 +332,14 @@ function logout() {
                 return Math.round(ema / 0.2) * 0.2; 
             });
 
-            // Array for Displacement (Absolute difference from initial starting point)
             const displacementArray = rawDistanceArray.map(currentDist => {
                 return Math.abs(currentInitialDistance - currentDist);
             });
 
-            // Update Chart 1
             charts.distance.data.labels = labels;
             charts.distance.data.datasets[0].data = rawDistanceArray;
             charts.distance.data.datasets[1].data = cleanDistanceArray;
 
-            // Update Chart 2
             charts.displacement.data.labels = labels;
             charts.displacement.data.datasets[0].data = displacementArray;
 
@@ -417,7 +363,17 @@ function logout() {
             charts.env.data.datasets[0].data = currentFilteredData.map(i => parseFloat(i.temp) || 0);
             charts.env.data.datasets[1].data = currentFilteredData.map(i => parseFloat(i.hum) || 0);
 
-            Object.values(charts).forEach(chart => chart.update('none'));
+            // UPDATED: Calculate indices to show exactly 10 timestamps by default
+            const totalPoints = labels.length;
+            const minIndex = Math.max(0, totalPoints - 10);
+            const maxIndex = totalPoints > 0 ? totalPoints - 1 : 0;
+
+            Object.values(charts).forEach(chart => {
+                // Apply the limits to the x-axis for the initial view
+                chart.options.scales.x.min = minIndex;
+                chart.options.scales.x.max = maxIndex;
+                chart.update('none');
+            });
         }
 
         function calculateAverages() {
@@ -434,7 +390,7 @@ function logout() {
                 const currentDist = parseFloat(item.gap) || 0;
                 
                 sums['distance'] += currentDist;
-                sums['displacement'] += Math.abs(currentInitialDistance - currentDist); // Calc on the fly
+                sums['displacement'] += Math.abs(currentInitialDistance - currentDist); 
                 sums['ax'] += (parseFloat(item.ax) || 0);
                 sums['ay'] += (parseFloat(item.ay) || 0);
                 sums['az'] += (parseFloat(item.az) || 0);
@@ -491,53 +447,105 @@ function logout() {
             Object.keys(charts).forEach(key => {
                 let chart = charts[key];
                 
-                // Keep default boundaries for certain charts
                 if (key === 'moisture') { chart.options.scales.y.min = 0; chart.options.scales.y.max = 100; } 
                 else if (key === 'displacement') { chart.options.scales.y.min = 0; chart.options.scales.y.max = 6; }
                 else { delete chart.options.scales.y.min; delete chart.options.scales.y.max; }
+                
+                // UPDATED: Reset X limits back to the 10 most recent points
+                const totalPoints = chart.data.labels.length;
+                if (totalPoints > 0) {
+                    chart.options.scales.x.min = Math.max(0, totalPoints - 10);
+                    chart.options.scales.x.max = totalPoints - 1;
+                }
                 
                 chart.resetZoom();
                 chart.update();
             });
         }
-    function logout() {
-    sessionStorage.clear();
-    localStorage.clear();
-    window.location.replace("/");
-}
-function logout() {
 
-  const confirmed = confirm(
-    "Are you sure you want to logout?"
-  );
+        // Check Device Movement Function
+        function checkDeviceMovement() {
+            if (!rawData || rawData.length === 0) {
+                alert("Please load data first using the 'Load Data' button.");
+                return;
+            }
 
-  if (!confirmed) return;
+            const start = new Date(document.getElementById('calibStartTime').value).getTime();
+            const end = new Date(document.getElementById('calibEndTime').value).getTime();
 
-  localStorage.removeItem(
-    "auth.isLoggedIn"
-  );
+            const checkData = rawData.filter(item => {
+                const itemTime = new Date(item.timestamp).getTime();
+                return itemTime >= start && itemTime <= end;
+            });
 
-  localStorage.removeItem(
-    "auth.username"
-  );
+            if (checkData.length === 0) {
+                alert("No data found in the selected calibration date range.");
+                return;
+            }
 
-  window.location.replace(
-    "index.html"
-  );
-}
-const loginTime =
-  Number(localStorage.getItem("auth.loginTime"));
+            const refGap = parseFloat(checkData[0].gap) || 0;
+            const refAx = parseFloat(checkData[0].ax) || 0;
+            const refAy = parseFloat(checkData[0].ay) || 0;
+            const refAz = parseFloat(checkData[0].az) || 0;
 
-const MAX_SESSION =
-  24 * 60 * 60 * 1000;
+            let hasMoved = false;
+            let moveTime = null;
+            let maxGapDiff = 0;
+            let maxAccDiff = 0;
 
-if (
-  !loginTime ||
-  Date.now() - loginTime > MAX_SESSION
-) {
-  localStorage.clear();
-  window.location.replace("index.html");
-}
+            const GAP_THRESHOLD = 0.5; 
+            const ACCEL_THRESHOLD = 0.2; 
+
+            for (let i = 1; i < checkData.length; i++) {
+                const item = checkData[i];
+                const currentGap = parseFloat(item.gap) || 0;
+                const ax = parseFloat(item.ax) || 0;
+                const ay = parseFloat(item.ay) || 0;
+                const az = parseFloat(item.az) || 0;
+
+                const gapDiff = Math.abs(currentGap - refGap);
+
+                const accDiff = Math.sqrt(
+                    Math.pow(ax - refAx, 2) + 
+                    Math.pow(ay - refAy, 2) + 
+                    Math.pow(az - refAz, 2)
+                );
+
+                if (gapDiff > maxGapDiff) maxGapDiff = gapDiff;
+                if (accDiff > maxAccDiff) maxAccDiff = accDiff;
+
+                if ((gapDiff > GAP_THRESHOLD || accDiff > ACCEL_THRESHOLD) && !hasMoved) {
+                    hasMoved = true;
+                    moveTime = item.timestamp; 
+                }
+            }
+
+            const resultDiv = document.getElementById('movementResult');
+            if (hasMoved) {
+                resultDiv.innerHTML = `
+                    <span style="color: var(--accent-warn); font-weight: bold; font-size: 14px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> MOVEMENT DETECTED
+                    </span><br>
+                    <span style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+                        Initial shift at: ${new Date(moveTime).toLocaleString()} <br>
+                        Max Drift: <strong style="color: #fff">${maxGapDiff.toFixed(2)} cm</strong> | 
+                        Max IMU Shift: <strong style="color: #fff">${maxAccDiff.toFixed(2)} g</strong>
+                    </span>`;
+                resultDiv.style.borderColor = 'var(--accent-warn)';
+            } else {
+                resultDiv.innerHTML = `
+                    <span style="color: var(--accent-green); font-weight: bold; font-size: 14px;">
+                        <i class="fa-solid fa-check-circle"></i> DEVICE STATIONARY
+                    </span><br>
+                    <span style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+                        Maintained calibrated position. <br>
+                        Max Drift: <strong style="color: #fff">${maxGapDiff.toFixed(2)} cm</strong> | 
+                        Max IMU Shift: <strong style="color: #fff">${maxAccDiff.toFixed(2)} g</strong>
+                    </span>`;
+                resultDiv.style.borderColor = 'var(--accent-green)';
+            }
+            resultDiv.style.display = 'block';
+        }
     </script>
 </body>
 </html>
